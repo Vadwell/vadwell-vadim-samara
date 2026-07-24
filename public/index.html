@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vadwell - Wellness Quiz</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <style>
+        :root {
+            --surface-0: #f5f5f5;
+            --surface-1: #ffffff;
+            --surface-2: #fafafa;
+            --text-primary: #1a1a1a;
+            --text-secondary: #666666;
+            --text-muted: #999999;
+            --border: #e0e0e0;
+            --border-strong: #d0d0d0;
+            --fill-accent: #0088cc;
+            --on-accent: #ffffff;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --surface-0: #0d0d0d;
+                --surface-1: #1a1a1a;
+                --surface-2: #262626;
+                --text-primary: #ffffff;
+                --text-secondary: #cccccc;
+                --text-muted: #888888;
+                --border: #333333;
+                --border-strong: #444444;
+                --fill-accent: #0088cc;
+                --on-accent: #ffffff;
+            }
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+                'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            background: var(--surface-0);
+            color: var(--text-primary);
+        }
+
+        #root {
+            min-height: 100vh;
+            background: var(--surface-0);
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState } = React;
+
+        function VadwellQuiz() {
+            // ===== ВАШИ ДАННЫЕ ВАДИМА =====
+            const TELEGRAM_TOKEN = '8562752336:AAHp5DSD0_-iFHxtS1X4oPCtYA2z4BelChU';
+            const TELEGRAM_CHAT_ID = '86455273';
+
+            const DISTRIBUTOR = {
+                name: 'Вадим',
+                city: 'Самара',
+                telegramBot: '@vadwell_vadim_bot',
+            };
+
+            const [screen, setScreen] = useState('welcome');
+            const [currentQuestion, setCurrentQuestion] = useState(0);
+            const [scores, setScores] = useState({});
+            const [formData, setFormData] = useState({ name: '', phone: '' });
+            const [loading, setLoading] = useState(false);
+            const [lastResult, setLastResult] = useState(null);
+
+            const questions = [
+                { 
+                    id: 'energy', 
+                    text: 'Как вы оцениваете свой уровень энергии в течение дня?', 
+                    options: [
+                        { text: 'Часто чувствую усталость', value: 1 },
+                        { text: 'Энергия выше среднего', value: 2 },
+                        { text: 'Периодически падает энергия', value: 3 },
+                    ]
+                },
+                { 
+                    id: 'sleep', 
+                    text: 'Как качество вашего сна?', 
+                    options: [
+                        { text: 'Часто беспокойно, просыпаюсь', value: 1 },
+                        { text: 'В целом нормально', value: 2 },
+                        { text: 'Спокойный и восстанавливающий', value: 3 },
+                    ]
+                },
+                { 
+                    id: 'legs', 
+                    text: 'Как часто вы ощущаете усталость или отечность ног?', 
+                    options: [
+                        { text: 'Каждый день', value: 1 },
+                        { text: '2-3 раза в неделю', value: 2 },
+                        { text: 'Редко или никогда', value: 3 },
+                    ]
+                },
+                { 
+                    id: 'activity', 
+                    text: 'Какой ваш уровень физической активности?', 
+                    options: [
+                        { text: 'Малоподвижный образ жизни', value: 1 },
+                        { text: 'Умеренная активность', value: 2 },
+                        { text: 'Регулярные занятия спортом', value: 3 },
+                    ]
+                },
+                { 
+                    id: 'stress', 
+                    text: 'Как вы управляете стрессом?', 
+                    options: [
+                        { text: 'Часто переживаю, трудно расслабиться', value: 1 },
+                        { text: 'Стараюсь найти баланс', value: 2 },
+                        { text: 'Хорошо справляюсь со стрессом', value: 3 },
+                    ]
+                },
+                { 
+                    id: 'nutrition', 
+                    text: 'Как вы оцениваете качество своего питания?', 
+                    options: [
+                        { text: 'Нерегулярное, не всегда сбалансированное', value: 1 },
+                        { text: 'Старательно придерживаюсь хороших привычек', value: 2 },
+                        { text: 'Сбалансированное, здоровое питание', value: 3 },
+                    ]
+                },
+            ];
+
+            const handleAnswer = (questionId, value) => {
+                const newScores = { ...scores, [questionId]: value };
+                setScores(newScores);
+                
+                if (currentQuestion < questions.length - 1) {
+                    setCurrentQuestion(currentQuestion + 1);
+                } else {
+                    setScreen('results');
+                }
+            };
+
+            const calculateBalance = () => {
+                const values = Object.values(scores);
+                return values.length > 0 ? Math.round((values.reduce((a, b) => a + b, 0) / (values.length * 3)) * 100) : 0;
+            };
+
+            const getRecommendations = () => {
+                const balance = calculateBalance();
+                if (balance <= 40) {
+                    return { 
+                        title: 'Требуется внимание', 
+                        emoji: '⚠️',
+                        items: ['Восстановление энергии', 'Улучшение качества сна', 'Забота о здоровье ног'] 
+                    };
+                } else if (balance <= 70) {
+                    return { 
+                        title: 'Хороший прогресс', 
+                        emoji: '👍',
+                        items: ['Поддержка текущего уровня', 'Укрепление здоровья', 'Профилактика'] 
+                    };
+                } else {
+                    return { 
+                        title: 'Отличный баланс', 
+                        emoji: '🌟',
+                        items: ['Сохранение достигнутого', 'Оптимизация самочувствия', 'Развитие потенциала'] 
+                    };
+                }
+            };
+
+            const handleFormChange = (e) => {
+                setFormData({ ...formData, [e.target.name]: e.target.value });
+            };
+
+            const handleSubmit = async () => {
+                if (!formData.name || !formData.phone) {
+                    alert('Пожалуйста, заполните все поля');
+                    return;
+                }
+
+                setLoading(true);
+                try {
+                    const message = `
+📊 <b>Новый контакт из Vadwell</b>
+
+👤 <b>Имя:</b> ${formData.name}
+📱 <b>Телефон:</b> ${formData.phone}
+📈 <b>Wellness-баланс:</b> ${calculateBalance()}%
+
+👨‍💼 <b>Консультант:</b> ${DISTRIBUTOR.name}
+📍 <b>Город:</b> ${DISTRIBUTOR.city}
+
+⏰ <b>Время:</b> ${new Date().toLocaleString('ru-RU')}
+
+➡️ Предложить: бесплатный сеанс "Лёгкие ноги"
+                    `;
+
+                    const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            chat_id: TELEGRAM_CHAT_ID,
+                            text: message.trim(),
+                            parse_mode: 'HTML',
+                        }),
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('Ошибка при отправке');
+                    }
+
+                    setLastResult({
+                        name: formData.name,
+                        balance: calculateBalance(),
+                        recommendation: getRecommendations().title,
+                    });
+
+                    setScreen('thank-you');
+                } catch (error) {
+                    console.error('Ошибка:', error);
+                    alert('Контакт получен! Скоро мы свяжемся с вами.');
+                    setLastResult({
+                        name: formData.name,
+                        balance: calculateBalance(),
+                        recommendation: getRecommendations().title,
+                    });
+                    setScreen('thank-you');
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            const shareToTelegram = () => {
+                const text = `Я прошла wellness-тест и получила ${calculateBalance()}%! Рекомендация: ${getRecommendations().title}. А ты? Пройди тест:`;
+                const url = window.location.href;
+                window.open(`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`, '_blank');
+            };
+
+            const shareToWhatsApp = () => {
+                const text = `Я прошла wellness-тест и получила ${calculateBalance()}%! Рекомендация: ${getRecommendations().title}. Пройди тест:`;
+                const url = window.location.href;
+                window.open(`https://wa.me/?text=${encodeURIComponent(text + ' ' + url)}`, '_blank');
+            };
+
+            const shareResult = () => {
+                const text = `Я прошла wellness-тест от Vadwell и получила ${calculateBalance()}%! Рекомендация: ${getRecommendations().title}. А ты? 👇`;
+                const url = window.location.href;
+                const fullText = `${text}\n\n${url}`;
+                navigator.clipboard.writeText(fullText);
+                alert('Ссылка скопирована!');
+            };
+
+            return (
+                <div style={{ background: 'var(--surface-0)', minHeight: '100vh', padding: '0' }}>
+                    {screen === 'welcome' && (
+                        <div style={{ padding: '2rem 1.5rem', maxWidth: '600px', margin: '0 auto', textAlign: 'center' }}>
+                            <div style={{ paddingTop: '3rem', paddingBottom: '2rem' }}>
+                                <div style={{ fontSize: '32px', fontWeight: '500', color: 'var(--text-primary)', marginBottom: '1rem' }}>
+                                    Vadwell
+                                </div>
+                                <h2 style={{ fontSize: '24px', fontWeight: '500', color: 'var(--text-primary)', marginBottom: '1rem', lineHeight: '1.4' }}>
+                                    Узнай, что говорит твоё тело о балансе
+                                </h2>
+                                <p style={{ fontSize: '16px', color: 'var(--text-secondary)', lineHeight: '1.6', marginBottom: '0.5rem' }}>
+                                    Простой тест поможет выявить, где у тебя может быть дефицит, и как начать чувствовать себя лучше.
+                                </p>
+                                <p style={{ fontSize: '14px', color: 'var(--text-muted)', marginBottom: '2rem' }}>
+                                    Тест создан консультантом <strong>{DISTRIBUTOR.name}</strong> ({DISTRIBUTOR.city})
+                                </p>
+                            </div>
+                            
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                <button 
+                                    onClick={() => { setScreen('quiz'); setCurrentQuestion(0); }}
+                                    style={{
+                                        padding: '12px 24px',
+                                        background: 'var(--fill-accent)',
+                                        color: 'var(--on-accent)',
+                                        border: 'none',
+                                        borderRadius: '8px',
+                                        fontSize: '16px',
+                                        fontWeight: '500',
+                                        cursor: 'pointer',
+                                    }}
+                                >
+                                    Начать тест
+                                </button>
+                                <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+                                    Это займёт всего 2–3 минуты
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
+                    {screen === 'quiz' && (
+                        <div style={{ padding: '2rem 1.5rem', maxWidth: '600px', margin: '0 auto' }}>
+                            <div style={{ marginBottom: '1.5rem' }}>
+                                <div style={{ display: 'flex', gap: '4px', marginBottom: '1rem' }}>
+                                    {questions.map((_, idx) => (
+                                        <div key={idx} style={{
+                                            flex: 1,
+                                            height: '4px',
+                                            background: idx <= currentQuestion ? 'var(--fill-accent)' : 'var(--border)',
+                                            borderRadius: '2px',
+                                        }}></div>
+                                    ))}
+                                </div>
+                                <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                                    Вопрос {currentQuestion + 1} из {questions.length}
+                                </p>
+                            </div>
+
+                            <h3 style={{ fontSize: '20px', fontWeight: '500', color: 'var(--text-primary)', marginBottom: '2rem', lineHeight: '1.5' }}>
+                                {questions[currentQuestion].text}
+                            </h3>
+
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                {questions[currentQuestion].options.map((option, idx) => (
+                                    <button
+                                        key={idx}
+                                        onClick={() => handleAnswer(questions[currentQuestion].id, option.value)}
+                                        style={{
+                                            padding: '14px 16px',
+                                            background: 'var(--surface-1)',
+                                            border: '0.5px solid var(--border)',
+                                            borderRadius: '8px',
+                                            fontSize: '15px',
+                                            color: 'var(--text-primary)',
+                                            cursor: 'pointer',
+                                            textAlign: 'left',
+                                            transition: 'all 0.2s',
+                                        }}
+                                        onMouseEnter={(e) => e.target.style.borderColor = 'var(--border-strong)'}
+                                        onMouseLeave={(e) => e.target.style.borderColor = 'var(--border)'}
+                                    >
+                                        {option.text}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {screen === 'results' && (
+                        <div style={{ padding: '2rem 1.5rem', maxWidth: '600px', margin: '0 auto' }}>
+                            <h2 style={{ fontSize: '24px', fontWeight: '500', color: 'var(--text-primary)', marginBottom: '2rem', textAlign: 'center' }}>
+                                Твой результат
+                            </h2>
+
+                            <div style={{
+                                background: 'var(--surface-1)',
+                                border: '0.5px solid var(--border)',
+                                borderRadius: '12px',
+                                padding: '2rem',
+                                marginBottom: '2rem',
+                                textAlign: 'center',
+                            }}>
+                                <div style={{ fontSize: '48px', marginBottom: '0.5rem' }}>
+                                    {getRecommendations().emoji}
+                                </div>
+                                <div style={{ fontSize: '48px', fontWeight: '500', color: 'var(--fill-accent)', marginBottom: '0.5rem' }}>
+                                    {calculateBalance()}%
+                                </div>
+                                <p style={{ fontSize: '16px', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
+                                    Уровень wellness-баланса
+                                </p>
+
+                                <div style={{ height: '8px', background: 'var(--border)', borderRadius: '4px', overflow: 'hidden', marginBottom: '1.5rem' }}>
+                                    <div style={{
+                                        height: '100%',
+                                        width: `${calculateBalance()}%`,
+                                        background: 'var(--fill-accent)',
+                                        borderRadius: '4px',
+                                    }}></div>
+                                </div>
+
+                                <div style={{ background: 'var(--surface-0)', borderRadius: '8px', padding: '1rem', textAlign: 'left' }}>
+                                    <h4 style={{ fontSize: '15px', fontWeight: '500', color: 'var(--text-primary)', marginBottom: '0.75rem' }}>
+                                        {getRecommendations().title}
+                                    </h4>
+                                    <ul style={{ margin: 0, paddingLeft: '20px' }}>
+                                        {getRecommendations().items.map((item, idx) => (
+                                            <li key={idx} style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: '1.5', marginBottom: '0.5rem' }}>
+                                                {item}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <h3 style={{ fontSize: '18px', fontWeight: '500', color: 'var(--text-primary)', marginBottom: '1.5rem' }}>
+                                Получить персональную консультацию
+                            </h3>
+
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '1.5rem' }}>
+                                <input
+                                    type="text"
+                                    name="name"
+                                    placeholder="Ваше имя"
+                                    value={formData.name}
+                                    onChange={handleFormChange}
+                                    style={{
+                                        padding: '12px 16px',
+                                        border: '0.5px solid var(--border)',
+                                        borderRadius: '8px',
+                                        fontSize: '15px',
+                                        background: 'var(--surface-2)',
+                                        color: 'var(--text-primary)',
+                                    }}
+                                />
+                                <input
+                                    type="tel"
+                                    name="phone"
+                                    placeholder="Ваш телефон (+7 XXX XXX-XX-XX)"
+                                    value={formData.phone}
+                                    onChange={handleFormChange}
+                                    style={{
+                                        padding: '12px 16px',
+                                        border: '0.5px solid var(--border)',
+                                        borderRadius: '8px',
+                                        fontSize: '15px',
+                                        background: 'var(--surface-2)',
+                                        color: 'var(--text-primary)',
+                                    }}
+                                />
+                            </div>
+
+                            <button
+                                onClick={handleSubmit}
+                                disabled={loading}
+                                style={{
+                                    width: '100%',
+                                    padding: '12px 24px',
+                                    background: loading ? 'var(--border)' : 'var(--fill-accent)',
+                                    color: 'var(--on-accent)',
+                                    border: 'none',
+                                    borderRadius: '8px',
+                                    fontSize: '15px',
+                                    fontWeight: '500',
+                                    cursor: loading ? 'not-allowed' : 'pointer',
+                                    marginBottom: '1rem',
+                                }}
+                            >
+                                {loading ? 'Отправляю...' : 'Получить консультацию'}
+                            </button>
+
+                            <button
+                                onClick={() => { setScreen('welcome'); setCurrentQuestion(0); setScores({}); setFormData({ name: '', phone: '' }); }}
+                                style={{
+                                    width: '100%',
+                                    padding: '12px 24px',
+                                    background: 'transparent',
+                                    color: 'var(--text-secondary)',
+                                    border: '0.5px solid var(--border)',
+                                    borderRadius: '8px',
+                                    fontSize: '15px',
+                                    cursor: 'pointer',
+                                }}
+                            >
+                                Пройти тест заново
+                            </button>
+                        </div>
+                    )}
+
+                    {screen === 'thank-you' && lastResult && (
+                        <div style={{ padding: '2rem 1.5rem', maxWidth: '600px', margin: '0 auto', textAlign: 'center' }}>
+                            <div style={{ paddingTop: '2rem', paddingBottom: '2rem' }}>
+                                <div style={{ fontSize: '48px', marginBottom: '1rem' }}>✅</div>
+                                <h2 style={{ fontSize: '24px', fontWeight: '500', color: 'var(--text-primary)', marginBottom: '1rem' }}>
+                                    Спасибо, {lastResult.name}!
+                                </h2>
+                                <p style={{ fontSize: '16px', color: 'var(--text-secondary)', lineHeight: '1.6', marginBottom: '2rem' }}>
+                                    Мы получили ваши данные. Скоро свяжемся с вами для записи на бесплатный сеанс "Лёгкие ноги".
+                                </p>
+                            </div>
+
+                            <div style={{
+                                background: 'var(--surface-1)',
+                                border: '0.5px solid var(--border)',
+                                borderRadius: '12px',
+                                padding: '1.5rem',
+                                marginBottom: '2rem',
+                                textAlign: 'center',
+                            }}>
+                                <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Ваш результат:</p>
+                                <div style={{ fontSize: '40px', fontWeight: '500', color: 'var(--fill-accent)' }}>
+                                    {lastResult.balance}%
+                                </div>
+                                <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
+                                    {lastResult.recommendation}
+                                </p>
+                            </div>
+
+                            <h3 style={{ fontSize: '16px', fontWeight: '500', color: 'var(--text-primary)', marginBottom: '1rem' }}>
+                                Поделись результатом
+                            </h3>
+
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '2rem' }}>
+                                <button
+                                    onClick={shareToTelegram}
+                                    style={{
+                                        padding: '12px 24px',
+                                        background: '#0088cc',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '8px',
+                                        fontSize: '14px',
+                                        fontWeight: '500',
+                                        cursor: 'pointer',
+                                    }}
+                                >
+                                    📱 Поделиться в Telegram
+                                </button>
+                                <button
+                                    onClick={shareToWhatsApp}
+                                    style={{
+                                        padding: '12px 24px',
+                                        background: '#25d366',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '8px',
+                                        fontSize: '14px',
+                                        fontWeight: '500',
+                                        cursor: 'pointer',
+                                    }}
+                                >
+                                    💬 Поделиться в WhatsApp
+                                </button>
+                                <button
+                                    onClick={shareResult}
+                                    style={{
+                                        padding: '12px 24px',
+                                        background: 'var(--surface-1)',
+                                        color: 'var(--text-primary)',
+                                        border: '0.5px solid var(--border)',
+                                        borderRadius: '8px',
+                                        fontSize: '14px',
+                                        fontWeight: '500',
+                                        cursor: 'pointer',
+                                    }}
+                                >
+                                    📋 Скопировать ссылку
+                                </button>
+                            </div>
+
+                            <button
+                                onClick={() => { setScreen('welcome'); setCurrentQuestion(0); setScores({}); setFormData({ name: '', phone: '' }); setLastResult(null); }}
+                                style={{
+                                    width: '100%',
+                                    padding: '12px 24px',
+                                    background: 'var(--fill-accent)',
+                                    color: 'var(--on-accent)',
+                                    border: 'none',
+                                    borderRadius: '8px',
+                                    fontSize: '15px',
+                                    fontWeight: '500',
+                                    cursor: 'pointer',
+                                }}
+                            >
+                                Пригласить подругу
+                            </button>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<VadwellQuiz />);
+    </script>
+</body>
+</html>
