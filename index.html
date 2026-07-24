@@ -20,6 +20,7 @@
             --border-strong: #d0d0d0;
             --fill-accent: #0088cc;
             --on-accent: #ffffff;
+            --success: #25d366;
         }
 
         @media (prefers-color-scheme: dark) {
@@ -62,10 +63,9 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState } = React;
+        const { useState, useEffect } = React;
 
         function VadwellQuiz() {
-            // ===== ВАШИ ДАННЫЕ ВАДИМА =====
             const TELEGRAM_TOKEN = '8562752336:AAHp5DSD0_-iFHxtS1X4oPCtYA2z4BelChU';
             const TELEGRAM_CHAT_ID = '86455273';
 
@@ -81,6 +81,8 @@
             const [formData, setFormData] = useState({ name: '', phone: '' });
             const [loading, setLoading] = useState(false);
             const [lastResult, setLastResult] = useState(null);
+            const [referralCount, setReferralCount] = useState(0);
+            const [sessionId] = useState(Math.random().toString(36).substring(7));
 
             const questions = [
                 { 
@@ -102,12 +104,12 @@
                     ]
                 },
                 { 
-                    id: 'legs', 
-                    text: 'Как часто вы ощущаете усталость или отечность ног?', 
+                    id: 'nutrition', 
+                    text: 'Как вы оцениваете качество своего питания?', 
                     options: [
-                        { text: 'Каждый день', value: 1 },
-                        { text: '2-3 раза в неделю', value: 2 },
-                        { text: 'Редко или никогда', value: 3 },
+                        { text: 'Нерегулярное, не всегда сбалансированное', value: 1 },
+                        { text: 'Старательно придерживаюсь хороших привычек', value: 2 },
+                        { text: 'Сбалансированное, здоровое питание', value: 3 },
                     ]
                 },
                 { 
@@ -129,15 +131,22 @@
                     ]
                 },
                 { 
-                    id: 'nutrition', 
-                    text: 'Как вы оцениваете качество своего питания?', 
+                    id: 'legs', 
+                    text: 'Как часто вы ощущаете усталость или отечность ног?', 
                     options: [
-                        { text: 'Нерегулярное, не всегда сбалансированное', value: 1 },
-                        { text: 'Старательно придерживаюсь хороших привычек', value: 2 },
-                        { text: 'Сбалансированное, здоровое питание', value: 3 },
+                        { text: 'Каждый день', value: 1 },
+                        { text: '2-3 раза в неделю', value: 2 },
+                        { text: 'Редко или никогда', value: 3 },
                     ]
                 },
             ];
+
+            useEffect(() => {
+                const stored = localStorage.getItem(`vadwell_referrals_${sessionId}`);
+                if (stored) {
+                    setReferralCount(parseInt(stored));
+                }
+            }, [sessionId]);
 
             const handleAnswer = (questionId, value) => {
                 const newScores = { ...scores, [questionId]: value };
@@ -182,7 +191,7 @@
                 setFormData({ ...formData, [e.target.name]: e.target.value });
             };
 
-            const handleSubmit = async () => {
+            const sendToTelegram = async (messageType) => {
                 if (!formData.name || !formData.phone) {
                     alert('Пожалуйста, заполните все поля');
                     return;
@@ -190,8 +199,28 @@
 
                 setLoading(true);
                 try {
-                    const message = `
-📊 <b>Новый контакт из Vadwell</b>
+                    let message = '';
+                    
+                    if (messageType === 'gift' && referralCount >= 3) {
+                        message = `
+🎁 <b>ЗАЯВКА НА ПОДАРОК - Массаж ног 15 мин</b>
+
+👤 <b>Имя:</b> ${formData.name}
+📱 <b>Телефон:</b> ${formData.phone}
+📈 <b>Wellness-баланс:</b> ${calculateBalance()}%
+
+⭐️ <b>Приглашено друзей:</b> ${referralCount}
+
+👨‍💼 <b>Консультант:</b> ${DISTRIBUTOR.name}
+📍 <b>Город:</b> ${DISTRIBUTOR.city}
+
+⏰ <b>Время:</b> ${new Date().toLocaleString('ru-RU')}
+
+✅ <b>Статус:</b> Квалифицирован на подарок (3+ приглашения)
+                        `;
+                    } else {
+                        message = `
+📊 <b>ЗАЯВКА НА МАССАЖ - Без приглашений</b>
 
 👤 <b>Имя:</b> ${formData.name}
 📱 <b>Телефон:</b> ${formData.phone}
@@ -202,8 +231,9 @@
 
 ⏰ <b>Время:</b> ${new Date().toLocaleString('ru-RU')}
 
-➡️ Предложить: бесплатный сеанс "Лёгкие ноги"
-                    `;
+➡️ <b>Статус:</b> Прямая заявка (без приглашений друзей)
+                        `;
+                    }
 
                     const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
                         method: 'POST',
@@ -223,33 +253,25 @@
                         name: formData.name,
                         balance: calculateBalance(),
                         recommendation: getRecommendations().title,
+                        messageType: messageType,
                     });
 
                     setScreen('thank-you');
                 } catch (error) {
                     console.error('Ошибка:', error);
-                    alert('Контакт получен! Скоро мы свяжемся с вами.');
-                    setLastResult({
-                        name: formData.name,
-                        balance: calculateBalance(),
-                        recommendation: getRecommendations().title,
-                    });
-                    setScreen('thank-you');
+                    alert('Ошибка при отправке данных');
                 } finally {
                     setLoading(false);
                 }
             };
 
             const shareToTelegram = () => {
-                const text = `Я прошла wellness-тест и получила ${calculateBalance()}%! Рекомендация: ${getRecommendations().title}. А ты? Пройди тест:`;
+                const text = `Я прошла wellness-тест и получила ${calculateBalance()}%! Рекомендация: ${getRecommendations().title}. Приходи и получи подарок вместе со мной!`;
                 const url = window.location.href;
+                const newCount = referralCount + 1;
+                localStorage.setItem(`vadwell_referrals_${sessionId}`, newCount.toString());
                 window.open(`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`, '_blank');
-            };
-
-            const shareToWhatsApp = () => {
-                const text = `Я прошла wellness-тест и получила ${calculateBalance()}%! Рекомендация: ${getRecommendations().title}. Пройди тест:`;
-                const url = window.location.href;
-                window.open(`https://wa.me/?text=${encodeURIComponent(text + ' ' + url)}`, '_blank');
+                setTimeout(() => setReferralCount(newCount), 500);
             };
 
             const shareResult = () => {
@@ -397,8 +419,22 @@
                                 </div>
                             </div>
 
+                            <div style={{
+                                background: 'var(--success)',
+                                color: 'white',
+                                borderRadius: '12px',
+                                padding: '1.5rem',
+                                marginBottom: '2rem',
+                                textAlign: 'center',
+                            }}>
+                                <p style={{ fontSize: '14px', marginBottom: '0.5rem', fontWeight: '500' }}>🎁 СПЕЦИАЛЬНОЕ ПРЕДЛОЖЕНИЕ</p>
+                                <p style={{ fontSize: '16px', fontWeight: '500', marginBottom: '1rem' }}>Бесплатный массаж ног (15 минут)</p>
+                                <p style={{ fontSize: '13px', marginBottom: '1rem' }}>Пригласи 3 подруг через этот тест и получи подарок!</p>
+                                <div style={{ fontSize: '20px', fontWeight: '500' }}>Приглашено: {referralCount} / 3</div>
+                            </div>
+
                             <h3 style={{ fontSize: '18px', fontWeight: '500', color: 'var(--text-primary)', marginBottom: '1.5rem' }}>
-                                Получить персональную консультацию
+                                Заполни форму
                             </h3>
 
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '1.5rem' }}>
@@ -434,24 +470,79 @@
                                 />
                             </div>
 
-                            <button
-                                onClick={handleSubmit}
-                                disabled={loading}
-                                style={{
-                                    width: '100%',
-                                    padding: '12px 24px',
-                                    background: loading ? 'var(--border)' : 'var(--fill-accent)',
-                                    color: 'var(--on-accent)',
-                                    border: 'none',
-                                    borderRadius: '8px',
-                                    fontSize: '15px',
-                                    fontWeight: '500',
-                                    cursor: loading ? 'not-allowed' : 'pointer',
-                                    marginBottom: '1rem',
-                                }}
-                            >
-                                {loading ? 'Отправляю...' : 'Получить консультацию'}
-                            </button>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '1.5rem' }}>
+                                {referralCount >= 3 ? (
+                                    <button
+                                        onClick={() => sendToTelegram('gift')}
+                                        disabled={loading}
+                                        style={{
+                                            width: '100%',
+                                            padding: '12px 24px',
+                                            background: loading ? 'var(--border)' : 'var(--success)',
+                                            color: 'white',
+                                            border: 'none',
+                                            borderRadius: '8px',
+                                            fontSize: '15px',
+                                            fontWeight: '500',
+                                            cursor: loading ? 'not-allowed' : 'pointer',
+                                        }}
+                                    >
+                                        {loading ? 'Отправляю...' : '🎁 Получить подарок - массаж ног!'}
+                                    </button>
+                                ) : (
+                                    <button
+                                        onClick={shareToTelegram}
+                                        style={{
+                                            width: '100%',
+                                            padding: '12px 24px',
+                                            background: 'var(--fill-accent)',
+                                            color: 'white',
+                                            border: 'none',
+                                            borderRadius: '8px',
+                                            fontSize: '15px',
+                                            fontWeight: '500',
+                                            cursor: 'pointer',
+                                        }}
+                                    >
+                                        📱 Пригласить подругу ({referralCount}/3)
+                                    </button>
+                                )}
+
+                                <button
+                                    onClick={() => sendToTelegram('direct')}
+                                    disabled={loading}
+                                    style={{
+                                        width: '100%',
+                                        padding: '12px 24px',
+                                        background: loading ? 'var(--border)' : 'var(--fill-accent)',
+                                        color: 'var(--on-accent)',
+                                        border: 'none',
+                                        borderRadius: '8px',
+                                        fontSize: '15px',
+                                        fontWeight: '500',
+                                        cursor: loading ? 'not-allowed' : 'pointer',
+                                    }}
+                                >
+                                    {loading ? 'Отправляю...' : 'Записаться на массаж сейчас'}
+                                </button>
+
+                                <button
+                                    onClick={shareResult}
+                                    style={{
+                                        width: '100%',
+                                        padding: '12px 24px',
+                                        background: 'var(--surface-1)',
+                                        color: 'var(--text-primary)',
+                                        border: '0.5px solid var(--border)',
+                                        borderRadius: '8px',
+                                        fontSize: '14px',
+                                        fontWeight: '500',
+                                        cursor: 'pointer',
+                                    }}
+                                >
+                                    📋 Скопировать ссылку
+                                </button>
+                            </div>
 
                             <button
                                 onClick={() => { setScreen('welcome'); setCurrentQuestion(0); setScores({}); setFormData({ name: '', phone: '' }); }}
@@ -479,7 +570,10 @@
                                     Спасибо, {lastResult.name}!
                                 </h2>
                                 <p style={{ fontSize: '16px', color: 'var(--text-secondary)', lineHeight: '1.6', marginBottom: '2rem' }}>
-                                    Мы получили ваши данные. Скоро свяжемся с вами для записи на бесплатный сеанс "Лёгкие ноги".
+                                    {lastResult.messageType === 'gift' 
+                                        ? 'Поздравляем! Вы получили подарок - бесплатный массаж ног 15 минут! Скоро свяжемся с вами.'
+                                        : 'Спасибо за заявку! Скоро свяжемся с вами для записи на бесплатный массаж.'
+                                    }
                                 </p>
                             </div>
 
@@ -500,60 +594,8 @@
                                 </p>
                             </div>
 
-                            <h3 style={{ fontSize: '16px', fontWeight: '500', color: 'var(--text-primary)', marginBottom: '1rem' }}>
-                                Поделись результатом
-                            </h3>
-
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '2rem' }}>
-                                <button
-                                    onClick={shareToTelegram}
-                                    style={{
-                                        padding: '12px 24px',
-                                        background: '#0088cc',
-                                        color: 'white',
-                                        border: 'none',
-                                        borderRadius: '8px',
-                                        fontSize: '14px',
-                                        fontWeight: '500',
-                                        cursor: 'pointer',
-                                    }}
-                                >
-                                    📱 Поделиться в Telegram
-                                </button>
-                                <button
-                                    onClick={shareToWhatsApp}
-                                    style={{
-                                        padding: '12px 24px',
-                                        background: '#25d366',
-                                        color: 'white',
-                                        border: 'none',
-                                        borderRadius: '8px',
-                                        fontSize: '14px',
-                                        fontWeight: '500',
-                                        cursor: 'pointer',
-                                    }}
-                                >
-                                    💬 Поделиться в WhatsApp
-                                </button>
-                                <button
-                                    onClick={shareResult}
-                                    style={{
-                                        padding: '12px 24px',
-                                        background: 'var(--surface-1)',
-                                        color: 'var(--text-primary)',
-                                        border: '0.5px solid var(--border)',
-                                        borderRadius: '8px',
-                                        fontSize: '14px',
-                                        fontWeight: '500',
-                                        cursor: 'pointer',
-                                    }}
-                                >
-                                    📋 Скопировать ссылку
-                                </button>
-                            </div>
-
                             <button
-                                onClick={() => { setScreen('welcome'); setCurrentQuestion(0); setScores({}); setFormData({ name: '', phone: '' }); setLastResult(null); }}
+                                onClick={() => { setScreen('welcome'); setCurrentQuestion(0); setScores({}); setFormData({ name: '', phone: '' }); setReferralCount(0); }}
                                 style={{
                                     width: '100%',
                                     padding: '12px 24px',
@@ -579,3 +621,4 @@
     </script>
 </body>
 </html>
+     
